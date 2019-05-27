@@ -6,15 +6,15 @@ def random_timeout():
     return random.randrange(cfg.LOW_TIMEOUT, cfg.HIGH_TIMEOUT) / 1000
 
 
-def spawn_thread(function, args):
-    t = threading.Thread(function, (args, ))
+def spawn_thread(target, args):
+    t = threading.Thread(target=target, args=(args, ))
     t.start()
     return t
 
 
 def send(addr, route, message=None):
     # TODO: decide for slash in address or not
-    url = addr + route
+    url = addr + '/' + route
     requests.get(
         url=url,
         params=message,
