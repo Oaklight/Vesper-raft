@@ -11,7 +11,7 @@ LEADER = 2
 
 class Node():
     def __init__(self, fellow, my_ip):
-        self.addr = my_ap
+        self.addr = my_ip
         self.fellow = fellow
         self.term = 0
         self.status = FOLLOWER
@@ -67,10 +67,10 @@ class Node():
         else:
             self.send_vote(False, addr, term)
 
-    def send_vote(self, choice, candidate, term):
+    def send_vote(self, choice, addr, term):
         message = {"term": self.term, "addr": self.addr, "choice": choice}
         route = "vote"
-        utils.send(candidate, route, message)
+        utils.send(addr, route, message)
 
 # ------------------------------
 # START PRESIDENT

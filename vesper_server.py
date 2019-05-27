@@ -11,16 +11,29 @@ def get_address(r):
     return str(addr) + ":" + str(port)
 
 
-@app.route('/vote', methods=['GET'])
+@app.route('/vote', methods=['POST'])
 def vote():
-    # n.recv_vote(request.remote_addr)
-    # logging.info(request.remote_addr)
-    print(get_address(request))
-    return jsonify({"address": get_address(request)})
+    addr = request.json["addr"]
+    n.recv_vote(addr)
+    return Response(status=200)
+    # print(request.form)
+    # return jsonify(request.form)
 
 
-# @app.route('/vote', methods=['GET'])
-# def vote():
+@app.route("/vote_req", methods=['POST'])
+def vote_req():
+    addr = request.json["addr"]
+    term = request.json["term"]
+    n.recv_vote_req(addr, term)
+    return Response(status=200)
+
+
+@app.route("/heartbeat_back", methods=['POST'])
+def heartbeat_back():
+    term = request.json["term"]
+    n.recv_heartbeat_back(term)
+    return Response(status=200)
+
 
 if __name__ == "__main__":
     # python server.py index ip_list
@@ -33,11 +46,12 @@ if __name__ == "__main__":
             for ip in f:
                 ip = ip.strip()
                 ip_list.append(ip)
+        print(ip_list)
         my_ip = ip_list.pop(index)
         http, host, port = my_ip.split(':')
         # print(host, port)
         n = Node(ip_list, my_ip)
         logging.info(f"starting {port}")
-        app.run(host="0.0.0.0", port=int(port), debug=True)
+        app.run(host="10.150.160.91", port=int(port), debug=True)
     else:
         print("usage: python server.py index ip_list_file")

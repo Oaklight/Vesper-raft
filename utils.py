@@ -12,13 +12,18 @@ def spawn_thread(target, args):
     return t
 
 
-def send(addr, route, message=None):
+def send(addr, route, message):
     # TODO: decide for slash in address or not
     url = addr + '/' + route
-    requests.get(
+    print()
+    print(url)
+    print(message)
+    print(type(message))
+    print()
+    requests.post(
         url=url,
-        params=message,
-        timeout=cfg.REQUESTS_TIMEOUT,
+        json=message,
+        # timeout=cfg.REQUESTS_TIMEOUT,
     )
     # requests.post(url=url, json=message)
 
