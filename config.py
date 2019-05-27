@@ -2,3 +2,6 @@ class cfg():
     # in ms
     LOW_TIMEOUT = 150
     HIGH_TIMEOUT = 300
+
+    REQUESTS_TIMEOUT = 0.01
+    HB_TIME = 0.50 - REQUESTS_TIMEOUT
