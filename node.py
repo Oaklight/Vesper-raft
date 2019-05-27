@@ -10,12 +10,14 @@ LEADER = 2
 
 
 class Node():
-    def __init__(self, fellow):
+    def __init__(self, fellow, my_ip):
+        self.addr = my_ap
         self.fellow = fellow
         self.term = 0
         self.status = FOLLOWER
         self.majority = len(self.fellow) / 2 + 1
         self.voteCount = 0
+        self.reset_timeout()
         self.init_timeout()
 
     def incrementVote(self, voter):
@@ -35,7 +37,7 @@ class Node():
 # ELECTION TIME CANDIDATE
 
     def send_vote_req(self):
-        message = {"term": self.term}
+        message = {"term": self.term, "addr": self.addr}
         route = "vote_req"
         # TODO: use map later for better performance
 
@@ -66,7 +68,7 @@ class Node():
             self.send_vote(False, addr, term)
 
     def send_vote(self, choice, candidate, term):
-        message = {"term": self.term, "choice": choice}
+        message = {"term": self.term, "addr": self.addr, "choice": choice}
         route = "vote"
         utils.send(candidate, route, message)
 
@@ -86,6 +88,7 @@ class Node():
             # logging messages
             message = {
                 "term": self.term,
+                "addr": self.addr,
             }
             utils.send(follower, route, message)
             time.sleep(cfg.HB_TIME)
@@ -136,12 +139,13 @@ class Node():
         route = "heartbeat_back"
         message = {
             "term": self.term,
+            "addr": self.addr,
         }
         # TODO add a message with the log stuff
         utils.send(leader, route, message)
 
     def init_timeout(self):
-        t_t = threading.Thread(self.timeout_loop)
+        t_t = threading.Thread(target=self.timeout_loop)
         t_t.start()
 
     def timeout_loop(self):
@@ -150,14 +154,3 @@ class Node():
                 self.startElection()
             else:
                 time.sleep(self.election_time - time.time())
-
-if __name__ == "__main__":
-    # python server.py index ip_list
-    index = int(sys.argv[0])
-    ip_list_file = sys.argv[1]
-    ip_list = []
-    with open(ip_list_file) as f:
-        for ip in f:
-            ip_list.append(ip)
-    my_ip = ip_list.pop(index)
-    n = Node(ip_list)
