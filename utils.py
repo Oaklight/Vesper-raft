@@ -6,14 +6,6 @@ def get_timeout():
     return random.randrange(cfg.LOW_TIMEOUT, cfg.HIGH_TIMEOUT)
 
 
-# def timeout_loop():
-#     loop = true
-#     while loop:
-
-# /follower
-# /leader
-
-
 def create_url(route, attributes=None):
     # given attributes it create a url route
     # some_route?input_file=file.txt&size=30
