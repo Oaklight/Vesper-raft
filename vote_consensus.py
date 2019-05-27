@@ -2,7 +2,6 @@ import threading
 import time
 import utils
 import sys
-
 from config import cfg
 
 FOLLOWER = 0
@@ -78,7 +77,8 @@ class Node():
         self.initThreadPool()
 
     def initThreadPool(self):
-        thread_pool = list(map(utils.spawn_thread, self.fellow))
+        args = [(self.send_heartbeat, ip) for ip in self.fellow]
+        map(utils.spawn_thread, args)
 
     def send_heartbeat(self, follower):
         route = "heartbeat"
@@ -93,7 +93,8 @@ class Node():
 # /heartbeat_back
 
     def recv_heartbeat_back(self, term):
-        # i thought i was leader, but a follower told me that there is a new term, so i now follow it
+        # i thought i was leader, but a follower told me
+        # that there is a new term, so i now follow it
         if term > self.term:
             self.term = term
             self.status = FOLLOWER

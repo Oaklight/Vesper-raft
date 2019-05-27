@@ -6,8 +6,8 @@ def random_timeout():
     return random.randrange(cfg.LOW_TIMEOUT, cfg.HIGH_TIMEOUT) / 1000
 
 
-def spawn_thread(follower):
-    t = threading.Thread(heartbeat, (follower, ))
+def spawn_thread(function, args):
+    t = threading.Thread(function, (args, ))
     t.start()
     return t
 
@@ -24,4 +24,4 @@ def send(addr, route, message=None):
 
 
 if __name__ == "__main__":
-    print(get_timeout())
+    pass
