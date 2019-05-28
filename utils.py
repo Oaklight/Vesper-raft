@@ -16,25 +16,20 @@ def spawn_thread(target, args):
 def send(addr, route, message):
     # TODO: decide for slash in address or not
     url = addr + '/' + route
-    # print()
-    print(url, message)
-    # print(message)
-    # print(type(message))
-    # print()
+    print("Sending request", url, message)
+
     try:
         reply = requests.post(
             url=url,
             json=message,
-            timeout=cfg.REQUESTS_TIMEOUT,
+            timeout=cfg.REQUESTS_TIMEOUT / 1000,
         )
     except Exception as e:
         print("ERROR REQUESTS")
-        print(e)
-    #     time.sleep(2)
-    # time.sleep(2)
+        # print(e)
+        return None
 
-    # requests.post(url=url, json=message)
-
-
-if __name__ == "__main__":
-    pass
+    if reply.status_code == 200:
+        return reply
+    else:
+        return None
