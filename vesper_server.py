@@ -8,8 +8,10 @@ app = Flask(__name__)
 
 @app.route("/vote_req", methods=['POST'])
 def vote_req():
+    # also need to let me know whether up-to-date or not
     term = request.json["term"]
-    choice = n.decide_vote(term)
+    commitIdx = request.json["commitIdx"]
+    choice = n.decide_vote(term, commitIdx)
     message = {"choice": choice}
     return jsonify(message)
 
