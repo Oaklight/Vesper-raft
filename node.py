@@ -109,24 +109,44 @@ class Node():
     def send_heartbeat(self, follower):
         print("Starting HEARTBEAT")
         route = "heartbeat"
+        matchId = 0
         while self.status == LEADER:
-            message = {"term": self.term}
+            entries = self.log[matchId:]
+            message = {
+                "term": self.term,
+                "entries": entries,
+                "commitIdx": self.commitIdx
+            }
             start = time.time()
             reply = utils.send(follower, route, message)
             if reply:
-                self.heartbeat_reply_handler(reply.json()["term"])
+                self.heartbeat_reply_handler(reply.json(), entries)
+                matchId = reply.json()["matchId"]
             delta = time.time() - start
             time.sleep((cfg.HB_TIME - delta) / 1000)
 
 # /heartbeat_back
 
-    def heartbeat_reply_handler(self, term):
+    def heartbeat_reply_handler(self, message, entries):
+        term = message["term"]
+        success = message["success"]
         # i thought i was leader, but a follower told me
         # that there is a new term, so i now follow it
         if term > self.term:
             self.term = term
             self.status = FOLLOWER
             self.init_timeout()
+        elif success:
+            for entry in entries:
+                entry.votes += 1
+
+    def updateDB(self):
+        while self.status == LEADER:
+            new_element = self.log[self.commitIdx + 1]
+            if new_element.votes > self.majority:
+                addtoDB(new_element)
+                self.commitIdx += 1
+            time.sleep(0.03)
 
         # TODO logging replies
 
@@ -144,6 +164,7 @@ class Node():
         # weird case if 2 are PRESIDENT of same term.
         # both receive an heartbeat
         # we will both step down
+        msg = request.json["m"]
         if self.term <= term:
             self.reset_timeout()
             # in case I am not follower
@@ -156,6 +177,7 @@ class Node():
             # i have missed a few messages
             if self.term < term:
                 self.term = term
+        # tell my term to possible old leader
         return self.term
 
     def init_timeout(self):
@@ -174,3 +196,20 @@ class Node():
                 break
             else:
                 time.sleep(delta)
+
+    def add(self, commitIdx, entries):
+        success = commitIdx <= self.commitIdx
+        if success:
+            self.log = self.log[:commitIdx] + entries
+            self.staged = self.log[self.commitIdx, commitIdx]
+            self.commitNPush()
+            self.commitIdx = commitIdx
+        return success, self.commitIdx
+
+    def commitNPush(self):
+        for each in self.staged:
+            _, k, v, a = each
+            if a == "add":
+                self.db[k] = v
+            elif a == "del":
+                self.db.remove(k)
