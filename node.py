@@ -1,7 +1,6 @@
 import threading
 import time
 import utils
-import sys
 from config import cfg
 
 FOLLOWER = 0
@@ -17,6 +16,7 @@ class Node():
         self.status = FOLLOWER
         self.majority = (len(self.fellow) / 2) + 1
         self.voteCount = 0
+        self.commitIdx = 0
         self.t_t = None
         self.init_timeout()
 
@@ -46,7 +46,8 @@ class Node():
             threading.Thread(target=self.ask_for_vote, args=(voter, )).start()
 
     def ask_for_vote(self, voter):
-        message = {"term": self.term}
+        # need to include self.commitIdx, only up-to-date candidate could win
+        message = {"term": self.term, "commitIdx": self.commitIdx}
         route = "vote_req"
         while self.status != LEADER:
             reply = utils.send(voter, route, message)
@@ -55,10 +56,18 @@ class Node():
                 print(f"RECEIVED VOTE {choice} from {voter}")
                 if choice and self.status != LEADER:
                     self.incrementVote(voter)
+                elif not choice:
+                    # they declined because either I'm out-of-date or not newest term
+                    # update my term
+                    term = reply.json()["term"]
+                    if term > self.term:
+                        self.term = term
+                    # fix out-of-date needed
                 break
 
     def send_vote_req_non_threaded(self):
-        message = {"term": self.term}
+        # need to include self.commitIdx, only up-to-date candidate could win
+        message = {"term": self.term, "commitIdx": self.commitIdx}
         route = "vote_req"
         # TODO: use map later for better performance
 
@@ -84,10 +93,12 @@ class Node():
 # ------------------------------
 # ELECTION TIME FOLLOWER
 
-    def decide_vote(self, term):
+    def decide_vote(self, term, commitIdx):
         # new election
-        if self.term < term:
-            self.reset_timeout()
+        # decline all non-up-to-date candidate's vote request as well
+        # but update term all the time, not reset timeout during decision
+        if self.term < term and self.commitIdx <= commitIdx:
+            # self.reset_timeout()
             self.term = term
             return True
         else:
