@@ -49,12 +49,12 @@ class Node():
         # need to include self.commitIdx, only up-to-date candidate could win
         message = {"term": self.term, "commitIdx": self.commitIdx}
         route = "vote_req"
-        while self.status != LEADER:
+        while self.status == CANDIDATE:
             reply = utils.send(voter, route, message)
             if reply:
                 choice = reply.json()["choice"]
                 print(f"RECEIVED VOTE {choice} from {voter}")
-                if choice and self.status != LEADER:
+                if choice and self.status == CANDIDATE:
                     self.incrementVote(voter)
                 elif not choice:
                     # they declined because either I'm out-of-date or not newest term
@@ -78,14 +78,14 @@ class Node():
 
         voters = self.fellow[:]
 
-        while len(self.remaining_voters) != 0 or self.status != LEADER:
+        while len(self.remaining_voters) != 0 or self.status == CANDIDATE:
             new_voters = []
             for voter in voters:
                 reply = utils.send(voter, route, message)
                 if reply:
                     choice = reply.json()["choice"]
                     print(f"RECEIVED VOTE {choice} from {voter}")
-                    if choice and self.status != LEADER:
+                    if choice and self.status == CANDIDATE:
                         self.incrementVote(voter)
                 else:
                     new_voters.append(voter)
