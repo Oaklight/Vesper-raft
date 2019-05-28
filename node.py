@@ -58,10 +58,11 @@ class Node():
                     self.incrementVote(voter)
                 elif not choice:
                     # they declined because either I'm out-of-date or not newest term
-                    # update my term
+                    # update my term and terminate the vote_req
                     term = reply.json()["term"]
                     if term > self.term:
                         self.term = term
+                        self.status = FOLLOWER
                     # fix out-of-date needed
                 break
 
@@ -98,11 +99,11 @@ class Node():
         # decline all non-up-to-date candidate's vote request as well
         # but update term all the time, not reset timeout during decision
         if self.term < term and self.commitIdx <= commitIdx:
-            # self.reset_timeout()
+            self.reset_timeout()
             self.term = term
-            return True
+            return True, self.term
         else:
-            return False
+            return False, self.term
 
 # ------------------------------
 # START PRESIDENT

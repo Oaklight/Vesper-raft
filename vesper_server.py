@@ -11,8 +11,8 @@ def vote_req():
     # also need to let me know whether up-to-date or not
     term = request.json["term"]
     commitIdx = request.json["commitIdx"]
-    choice = n.decide_vote(term, commitIdx)
-    message = {"choice": choice}
+    choice, term = n.decide_vote(term, commitIdx)
+    message = {"choice": choice, "term": term}
     return jsonify(message)
 
 
