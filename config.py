@@ -1,7 +1,7 @@
 class cfg():
     # in ms
-    LOW_TIMEOUT = 6000
-    HIGH_TIMEOUT = 10000
+    LOW_TIMEOUT = 150
+    HIGH_TIMEOUT = 300
 
-    REQUESTS_TIMEOUT = 0.3
-    HB_TIME = 1
+    REQUESTS_TIMEOUT = 50
+    HB_TIME = 50

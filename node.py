@@ -22,27 +22,43 @@ class Node():
 
     def incrementVote(self, voter):
         self.voteCount += 1
-        print(f"number of vote received {self.voteCount}")
-        # self.remaining_voters.remove(voter)
         if self.voteCount >= self.majority:
-            print(
-                f"{self.term} WIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIN"
-            )
             self.status = LEADER
             self.startHeartBeat()
 
     def startElection(self):
+        print(f"-----Starting ELECTION term: {self.term}")
         self.voteCount = 1
         self.term += 1
         self.status = CANDIDATE
-        # self.remaining_voters = self.fellow[:]
         self.init_timeout()
         self.send_vote_req()
+
 # ------------------------------
 # ELECTION TIME CANDIDATE
 
     def send_vote_req(self):
-        message = {"term": self.term, "addr": self.addr}
+        # TODO: use map later for better performance
+        # we continue to ask to vote to the address that haven't voted yet
+        # till everyone has voted
+        # or I am the leader
+        for voter in self.fellow:
+            threading.Thread(target=self.ask_for_vote, args=(voter, )).start()
+
+    def ask_for_vote(self, voter):
+        message = {"term": self.term}
+        route = "vote_req"
+        while self.status != LEADER:
+            reply = utils.send(voter, route, message)
+            if reply:
+                choice = reply.json()["choice"]
+                print(f"RECEIVED VOTE {choice} from {voter}")
+                if choice and self.status != LEADER:
+                    self.incrementVote(voter)
+                break
+
+    def send_vote_req_non_threaded(self):
+        message = {"term": self.term}
         route = "vote_req"
         # TODO: use map later for better performance
 
@@ -50,37 +66,32 @@ class Node():
         # till everyone has voted
         # or I am the leader
 
-        # while len(self.remaining_voters) != 0 or self.status != LEADER:
-        # for each in self.remaining_voters:
-        #     utils.send(each, route, message)
-        # time.sleep(0.5)
-        for each in self.fellow:
-            utils.send(each, route, message)
+        voters = self.fellow[:]
 
-# "/vote"
-
-    def recv_vote(self, voter_ip):
-        if self.status != LEADER:
-            self.incrementVote(voter_ip)
+        while len(self.remaining_voters) != 0 or self.status != LEADER:
+            new_voters = []
+            for voter in voters:
+                reply = utils.send(voter, route, message)
+                if reply:
+                    choice = reply.json()["choice"]
+                    print(f"RECEIVED VOTE {choice} from {voter}")
+                    if choice and self.status != LEADER:
+                        self.incrementVote(voter)
+                else:
+                    new_voters.append(voter)
+            voters = new_voters
 
 # ------------------------------
 # ELECTION TIME FOLLOWER
 
-# "/vote_req"
-
-    def recv_vote_req(self, addr, term):
+    def decide_vote(self, term):
         # new election
         if self.term < term:
             self.reset_timeout()
             self.term = term
-            self.send_vote(True, addr, term)
+            return True
         else:
-            self.send_vote(False, addr, term)
-
-    def send_vote(self, choice, addr, term):
-        message = {"term": self.term, "addr": self.addr, "choice": choice}
-        route = "vote"
-        utils.send(addr, route, message)
+            return False
 
 # ------------------------------
 # START PRESIDENT
@@ -89,34 +100,27 @@ class Node():
         self.initThreadPool()
 
     def initThreadPool(self):
-        # args = [(self.send_heartbeat, ip) for ip in self.fellow]
-        # map(utils.spawn_thread, args)
         print("INIT THREADPOOL")
-
         for each in self.fellow:
             print(each)
             t = threading.Thread(target=self.send_heartbeat, args=(each, ))
             t.start()
-            # threading.Thread(
-            #     target=self.send_heartbeat,
-            #     args=(each, ),
-            # ).start
 
     def send_heartbeat(self, follower):
-        print("sending HEARTBEAT")
+        print("Starting HEARTBEAT")
         route = "heartbeat"
         while self.status == LEADER:
-            # logging messages
-            message = {
-                "term": self.term,
-                "addr": self.addr,
-            }
-            utils.send(follower, route, message)
-            time.sleep(cfg.HB_TIME)
+            message = {"term": self.term}
+            start = time.time()
+            reply = utils.send(follower, route, message)
+            if reply:
+                self.heartbeat_reply_handler(reply.json()["term"])
+            delta = time.time() - start
+            time.sleep((cfg.HB_TIME - delta) / 1000)
 
 # /heartbeat_back
 
-    def recv_heartbeat_back(self, adr, term):
+    def heartbeat_reply_handler(self, term):
         # i thought i was leader, but a follower told me
         # that there is a new term, so i now follow it
         if term > self.term:
@@ -130,19 +134,18 @@ class Node():
 # FOLLOWER STUFF
 
     def reset_timeout(self):
+        # print("RESET TIMEOUT")
         self.election_time = time.time() + utils.random_timeout()
 
 
 # /heartbeat
 
-    def recv_heartbeat(self, addr, term):
-        print("heartbeat_back")
+    def heartbeat_follower(self, term):
         # weird case if 2 are PRESIDENT of same term.
         # both receive an heartbeat
         # we will both step down
         if self.term <= term:
             self.reset_timeout()
-            self.send_heartbeat_back(addr)
             # in case I am not follower
             # or started an election and lost it
             if self.status == CANDIDATE:
@@ -153,24 +156,13 @@ class Node():
             # i have missed a few messages
             if self.term < term:
                 self.term = term
-        else:
-            # inform the poor leader that he is an old man
-            self.send_heartbeat_back(addr)
-
-    def send_heartbeat_back(self, leader):
-        route = "heartbeat_back"
-        message = {
-            "term": self.term,
-            "addr": self.addr,
-        }
-        # TODO add a message with the log stuff
-        utils.send(leader, route, message)
+        return self.term
 
     def init_timeout(self):
-        print("INIT TIMEOUT")
+        self.reset_timeout()
+        print("---> INIT TIMEOUT")
         if self.t_t and self.t_t.isAlive():
             return
-        self.reset_timeout()
         self.t_t = threading.Thread(target=self.timeout_loop)
         self.t_t.start()
 
@@ -181,5 +173,4 @@ class Node():
                 self.startElection()
                 break
             else:
-                # print(f"SLEEP {delta}")
-                time.sleep(delta / 10)
+                time.sleep(delta)
