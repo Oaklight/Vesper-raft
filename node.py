@@ -123,6 +123,9 @@ class Node():
         route = "heartbeat"
         matchIdx = 0
         while self.status == LEADER:
+
+            # TODO msg empty entries and get follower matchIdx
+
             entries = self.log[matchIdx:]
             message = {
                 "term": self.term,
