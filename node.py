@@ -121,12 +121,30 @@ class Node():
     def send_heartbeat(self, follower):
         print("Starting HEARTBEAT")
         route = "heartbeat"
+        matchIdx = 0
         while self.status == LEADER:
-            message = {"term": self.term}
+            entries = self.log[matchIdx:]
+            message = {
+                "term": self.term,
+                "entries": entries,
+                "commitIdx": self.commitIdx,
+            }
             start = time.time()
             reply = utils.send(follower, route, message)
             if reply:
-                self.heartbeat_reply_handler(reply.json()["term"])
+                voter_term = reply.json()["term"]
+                self.heartbeat_reply_handler(voter_term)
+
+                matchIdx = reply.json["matchIdx"]
+                success = reply.json["success"]
+                if success:
+                    # vote for the entries
+                    self.follower_agree_to_add(entries)
+                    pass
+                else:
+                    # this should never happen
+                    print("F**KED UP " * 1000)
+
             delta = time.time() - start
             time.sleep((cfg.HB_TIME - delta) / 1000)
 
@@ -149,10 +167,9 @@ class Node():
         # print("RESET TIMEOUT")
         self.election_time = time.time() + utils.random_timeout()
 
-
 # /heartbeat
 
-    def heartbeat_follower(self, term):
+    def heartbeat_follower(self, term, entries, commitIdx):
         # weird case if 2 are PRESIDENT of same term.
         # both receive an heartbeat
         # we will both step down
@@ -168,7 +185,12 @@ class Node():
             # i have missed a few messages
             if self.term < term:
                 self.term = term
-        return self.term
+            # success if self.commitIdx <= leader.commitIdx, commitIdx always ends up with leader.commitIdx
+            # fail if self.commitIdx
+            success, commitIdx = self.add(commitIdx, entries)
+        else:
+            success = False
+        return self.term, success, self.commitIdx
 
     def init_timeout(self):
         self.reset_timeout()
@@ -186,3 +208,28 @@ class Node():
                 break
             else:
                 time.sleep(delta)
+
+
+# ------------------------------
+# log replication stuff
+
+    def add(self, leaderCommitIdx, entries):
+
+        success = self.commitIdx <= leaderCommitIdx
+        matchIdx = self.commitIdx
+        if success:
+            self.log = self.log[:self.commitIdx] + entries
+            # we write the already confirmed consensus into local db
+            staged = self.log[self.commitIdx, leaderCommitIdx]
+            self.commitNPush(staged)
+            self.commitIdx = leaderCommitIdx
+        # return success, self.commitIdx
+        return success, matchIdx
+
+    def commitNPush(self, staged):
+        for each in staged:
+            _, k, v, a = each
+            if a == "add":
+                self.db[k] = v
+            elif a == "del":
+                self.db.remove(k)

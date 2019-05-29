@@ -19,8 +19,10 @@ def vote_req():
 @app.route("/heartbeat", methods=['POST'])
 def heartbeat():
     term = request.json["term"]
-    term = n.heartbeat_follower(term)
-    message = {"term": term}
+    entries = request.json["entries"]
+    commitIdx = request.json["commitIdx"]
+    term, success, matchIdx = n.heartbeat_follower(term, entries, commitIdx)
+    message = {"term": term, "success": success, "matchIdx": matchIdx}
     return jsonify(message)
 
 
