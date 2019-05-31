@@ -16,7 +16,7 @@ def spawn_thread(target, args):
 def send(addr, route, message):
     # TODO: decide for slash in address or not
     url = addr + '/' + route
-    print("Sending request", url, message)
+    # print("Sending request", url, message)
 
     try:
         reply = requests.post(
@@ -32,4 +32,5 @@ def send(addr, route, message):
     if reply.status_code == 200:
         return reply
     else:
+        print(reply.status_code, reply)
         return None

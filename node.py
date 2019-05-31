@@ -13,7 +13,7 @@ class Node():
         self.addr = my_ip
         self.fellow = fellow
         self.lock = threading.Lock()
-        self.DB = {}
+        self.DB = {"first": 1}
         self.staged = None
         self.term = 0
         self.status = FOLLOWER
@@ -177,6 +177,7 @@ class Node():
                 self.term = term
 
             if "action" in msg:
+                print("received action, msg", msg)
                 action = msg["action"]
                 if action == "log":
                     payload = msg["payload"]
@@ -217,28 +218,39 @@ class Node():
             return None
 
     def handle_put(self, payload):
-        self.lock.acquire()
-        self.staged = payload
-        success = False
-        c = 0
-        msg = {
-            "term": self.term,
-            "addr": self.addr,
-            "payload": payload,
-            "action": "log"
-        }
-        for each in self.fellow:
-            r = utils.send(each, "/heartbeat", msg)
-            if r:
-                c += 1
-        if c > self.majority:
-            key = self.staged["key"]
-            value = self.staged["value"]
-            self.DB[key] = value
-            msg["action"] = "confirm"
+        try:
+            self.lock.acquire()
+            self.staged = payload
+            success = False
+            c = 0
+            msg = {
+                "term": self.term,
+                "addr": self.addr,
+                "payload": payload,
+                "action": "log"
+            }
+
             for each in self.fellow:
-                r = utils.send(each, "/heartbeat", msg)
-            success = True
+                print("loop 1")
+                r = utils.send(each, "heartbeat", msg)
+                print(r)
+                if r:
+                    c += 1
+            print(c)
+            if c >= self.majority:
+                key = self.staged["key"]
+                value = self.staged["value"]
+                self.DB[key] = value
+                msg["action"] = "confirm"
+                for each in self.fellow:
+                    print("loop 2")
+
+                    r = utils.send(each, "heartbeat", msg)
+                success = True
+        except Exception as e:
+            print(e)
+            self.lock.release()
+            exit(1)
 
         self.lock.release()
         return success

@@ -9,7 +9,7 @@ def put(addr, key, value):
     payload = {'key': key, 'value': value}
     message = {"type": "put", "payload": payload}
     print(f"Sending: {message}")
-    response = requests.post(server_address, json=message)
+    response = requests.put(server_address, json=message)
     print(response)
 
 
@@ -40,6 +40,6 @@ if __name__ == "__main__":
         addr = sys.argv[1]
         key = sys.argv[2]
         val = sys.argv[3]
-        get(addr, key, val)
+        put(addr, key, val)
     # else:
     #     print("normal usage: python3 client.py <port0-port1-..> 'key' 'value'")
