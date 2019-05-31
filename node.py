@@ -12,6 +12,9 @@ class Node():
     def __init__(self, fellow, my_ip):
         self.addr = my_ip
         self.fellow = fellow
+        self.lock = threading.Lock()
+        self.DB = {}
+        self.staged = None
         self.term = 0
         self.status = FOLLOWER
         self.majority = (len(self.fellow) / 2) + 1
@@ -123,7 +126,7 @@ class Node():
         print("Starting HEARTBEAT")
         route = "heartbeat"
         while self.status == LEADER:
-            message = {"term": self.term}
+            message = {"term": self.term, "addr": self.addr}
             start = time.time()
             reply = utils.send(follower, route, message)
             if reply:
@@ -150,14 +153,17 @@ class Node():
         # print("RESET TIMEOUT")
         self.election_time = time.time() + utils.random_timeout()
 
-
 # /heartbeat
 
-    def heartbeat_follower(self, term):
+# def heartbeat_follower(self, term):
+
+    def heartbeat_follower(self, msg):
         # weird case if 2 are PRESIDENT of same term.
         # both receive an heartbeat
         # we will both step down
+        term = msg["term"]
         if self.term <= term:
+            self.leader = msg["addr"]
             self.reset_timeout()
             # in case I am not follower
             # or started an election and lost it
@@ -169,6 +175,17 @@ class Node():
             # i have missed a few messages
             if self.term < term:
                 self.term = term
+
+            if "action" in msg:
+                action = msg["action"]
+                if action == "log":
+                    payload = msg["payload"]
+                    self.staged = payload
+                else:
+                    key = self.staged["key"]
+                    value = self.staged["value"]
+                    self.DB[key] = value
+
         return self.term
 
     def init_timeout(self):
@@ -187,3 +204,41 @@ class Node():
                 # break
             else:
                 time.sleep(delta)
+
+
+# handle request
+
+    def handle_get(self, payload):
+        key = payload["key"]
+        if key in self.DB:
+            payload["value"] = self.DB[key]
+            return payload
+        else:
+            return None
+
+    def handle_put(self, payload):
+        self.lock.acquire()
+        self.staged = payload
+        success = False
+        c = 0
+        msg = {
+            "term": self.term,
+            "addr": self.addr,
+            "payload": payload,
+            "action": "log"
+        }
+        for each in self.fellow:
+            r = utils.send(each, "/heartbeat", msg)
+            if r:
+                c += 1
+        if c > self.majority:
+            key = self.staged["key"]
+            value = self.staged["value"]
+            self.DB[key] = value
+            msg["action"] = "confirm"
+            for each in self.fellow:
+                r = utils.send(each, "/heartbeat", msg)
+            success = True
+
+        self.lock.release()
+        return success
