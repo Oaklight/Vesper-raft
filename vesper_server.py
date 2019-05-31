@@ -1,9 +1,51 @@
 from node import Node
+from node import FOLLOWER, LEADER, CANDIDATE
 from flask import Flask, request, jsonify, Response
+import utils
 import sys
 import logging
 
 app = Flask(__name__)
+
+
+@app.route("/value", methods=['GET'])
+def value():
+    payload = request.json["payload"]
+    if n.status == LEADER:
+        # request handle, reply is a dictionary
+        result = n.handle_get(payload)
+        if result:
+            reply = {"code": "success", "payload": result}
+        else:
+            reply = {"code": 'fail', 'payload': payload}
+    elif n.status == FOLLOWER:
+        # redirect request
+        leader = n.leader
+        payload["message"] = leader
+        reply = {"code": 'fail', 'payload': payload}
+    else:
+        reply = {"code": 'fail', 'payload': payload}
+    return jsonify(reply)
+
+
+@app.route("/value", methods=['PUT'])
+def value():
+    payload = request.json["payload"]
+    if n.status == LEADER:
+        # request handle, reply is a dictionary
+        result = n.handle_put(payload)
+        if result:
+            reply = {"code": "success"}
+        else:
+            reply = {"code": 'fail'}
+    elif n.status == FOLLOWER:
+        # redirect request
+        leader = n.leader
+        payload["message"] = leader
+        reply = {"code": 'fail', 'payload': payload}
+    else:
+        reply = {"code": 'fail'}
+    return jsonify(reply)
 
 
 @app.route("/vote_req", methods=['POST'])
@@ -18,8 +60,9 @@ def vote_req():
 
 @app.route("/heartbeat", methods=['POST'])
 def heartbeat():
-    term = request.json["term"]
-    term = n.heartbeat_follower(term)
+    # term = request.json["term"]
+    term = n.heartbeat_follower(request.json)
+    # return anyway, if nothing received by leader, we dead
     message = {"term": term}
     return jsonify(message)
 
