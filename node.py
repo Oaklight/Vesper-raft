@@ -43,17 +43,18 @@ class Node():
         # till everyone has voted
         # or I am the leader
         for voter in self.fellow:
-            threading.Thread(target=self.ask_for_vote, args=(voter, )).start()
+            threading.Thread(target=self.ask_for_vote,
+                             args=(voter, self.term)).start()
 
-    def ask_for_vote(self, voter):
-        message = {"term": self.term}
+    def ask_for_vote(self, voter, term):
+        message = {"term": term}
         route = "vote_req"
-        while self.status != LEADER:
+        while self.status == CANDIDATE and self.term == term:
             reply = utils.send(voter, route, message)
             if reply:
                 choice = reply.json()["choice"]
                 print(f"RECEIVED VOTE {choice} from {voter}")
-                if choice and self.status != LEADER:
+                if choice and self.status == CANDIDATE:
                     self.incrementVote(voter)
                 break
 
@@ -171,6 +172,6 @@ class Node():
             delta = self.election_time - time.time()
             if delta < 0:
                 self.startElection()
-                break
+                # break
             else:
                 time.sleep(delta)
