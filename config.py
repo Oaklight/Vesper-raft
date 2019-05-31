@@ -1,3 +1,4 @@
+# timing variables
 class cfg():
     # in ms
     LOW_TIMEOUT = 150
