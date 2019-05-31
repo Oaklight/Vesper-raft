@@ -9,7 +9,7 @@ app = Flask(__name__)
 
 
 @app.route("/value", methods=['GET'])
-def value():
+def value_get():
     payload = request.json["payload"]
     if n.status == LEADER:
         # request handle, reply is a dictionary
@@ -29,7 +29,7 @@ def value():
 
 
 @app.route("/value", methods=['PUT'])
-def value():
+def value_put():
     payload = request.json["payload"]
     if n.status == LEADER:
         # request handle, reply is a dictionary
