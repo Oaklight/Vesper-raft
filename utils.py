@@ -1,22 +1,14 @@
-import random, requests, threading
+import random
+import requests
 from config import cfg
-import time
 
 
 def random_timeout():
     return random.randrange(cfg.LOW_TIMEOUT, cfg.HIGH_TIMEOUT) / 1000
 
 
-def spawn_thread(target, args):
-    t = threading.Thread(target=target, args=(args, ))
-    t.start()
-    return t
-
-
 def send(addr, route, message):
-    # TODO: decide for slash in address or not
     url = addr + '/' + route
-    print("Sending request", url, message)
 
     try:
         reply = requests.post(
@@ -24,8 +16,8 @@ def send(addr, route, message):
             json=message,
             timeout=cfg.REQUESTS_TIMEOUT / 1000,
         )
+    # failed to send request
     except Exception as e:
-        print("ERROR REQUESTS")
         # print(e)
         return None
 

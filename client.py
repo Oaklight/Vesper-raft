@@ -1,40 +1,65 @@
-import sys, json, requests
-
-IP = "http://127.0.0.1"
+import sys, requests
 
 
-def send_key_value(port, key, value):
-    server_address = IP + ':' + port + "/put"
-    print(server_address)
-    packet = {'key': key, 'value': value}
-    print(f"Sending: {packet}")
-    response = requests.post(server_address, json=packet)
-    print(response)
+def redirectToLeader(server_address, message):
+    type = message["type"]
+    # looping until someone tells he is the leader
+    while True:
+        # switching between "get" and "put"
+        if type == "get":
+            response = requests.get(server_address, json=message)
+        else:
+            response = requests.put(server_address, json=message)
+
+        # if valid response and an address in the "message" section in reply
+        # redirect server_address to the potential leader
+        if response.status_code == 200 and "payload" in response.json():
+            payload = response.json()["payload"]
+            if "message" in payload:
+                server_address = payload["message"] + "/request"
+            else:
+                break
+        else:
+            break
+    # if type == "get":
+    return response.json()
+    # else:
+    #     return response
 
 
-def get(port, key):
-    server_address = IP + ':' + port + "/get"
-    print(server_address)
-    packet = {
-        'key': key,
-    }
-    print(f"Sending: {packet}")
-    response = requests.get(server_address, json=packet)
-    if response.status_code == 200:
-        print(response.json())
-    else:
-        print(f"{key} not found")
+# client put request
+def put(addr, key, value):
+    server_address = addr + "/request"
+    payload = {'key': key, 'value': value}
+    message = {"type": "put", "payload": payload}
+    # redirecting till we find the leader, in case of request during election
+    print(redirectToLeader(server_address, message))
+
+
+# client get request
+def get(addr, key):
+    server_address = addr + "/request"
+    payload = {'key': key}
+    message = {"type": "get", "payload": payload}
+    # redirecting till we find the leader, in case of request during election
+    print(redirectToLeader(server_address, message))
 
 
 if __name__ == "__main__":
-    if len(sys.argv) == 4:
-        # normal mode
-        ports = [port for port in sys.argv[1].split('-')]
+    if len(sys.argv) == 3:
+        # addr, key
+        # get
+        addr = sys.argv[1]
         key = sys.argv[2]
-        value = sys.argv[3]
-        send_key_value(ports[0], key, value)
-        key = "aaaaa"
-        get(ports[0], key)
-
+        get(addr, key)
+    elif len(sys.argv) == 4:
+        # addr, key value
+        # put
+        addr = sys.argv[1]
+        key = sys.argv[2]
+        val = sys.argv[3]
+        put(addr, key, val)
     else:
-        print("normal usage: python3 client.py <port0-port1-..> 'key' 'value'")
+        print("PUT usage: python3 client.py address 'key' 'value'")
+        print("GET usage: python3 client.py address 'key'")
+        print("Format: address: http://ip:port")
