@@ -8,9 +8,21 @@ def put(addr, key, value):
     print(server_address)
     payload = {'key': key, 'value': value}
     message = {"type": "put", "payload": payload}
-    print(f"Sending: {message}")
-    response = requests.put(server_address, json=message)
-    print(response)
+    # print(f"Sending: {message}")
+    while True:
+        print(server_address, message)
+        response = requests.put(server_address, json=message)
+        # print(response.json())
+        if response.status_code == 200 and "payload" in response.json():
+            payload = response.json()["payload"]
+            if "message" in payload:
+                print("get message", payload["message"])
+                server_address = payload["message"] + "/value"
+            else:
+                print(response)
+                break
+        else:
+            break
 
 
 def get(addr, key):
@@ -19,11 +31,30 @@ def get(addr, key):
     payload = {'key': key}
     message = {"type": "get", "payload": payload}
     print(f"Sending: {message}")
+
+    while True:
+        response = requests.get(server_address, json=message)
+        if response.status_code == 200 and "payload" in response.json():
+            payload = response.json()["payload"]
+            if "message" in payload:
+                print("get message", payload["message"])
+                server_address = payload["message"] + "/value"
+            else:
+                print(response.json())
+                break
+        else:
+            break
+
+
+def old_get(addr, key):
+    server_address = addr + "/value"
+    print(server_address)
+    payload = {'key': key}
+    message = {"type": "get", "payload": payload}
+    print(f"Sending: {message}")
     response = requests.get(server_address, json=message)
     if response.status_code == 200:
         print(response.json())
-    else:
-        print(f"{key} not found")
 
 
 if __name__ == "__main__":
