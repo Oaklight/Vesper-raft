@@ -58,7 +58,11 @@ class Node():
     # request vote to other servers during given election term
     def ask_for_vote(self, voter, term):
         # need to include self.commitIdx, only up-to-date candidate could win
-        message = {"term": term, "commitIdx": self.commitIdx}
+        message = {
+            "term": term,
+            "commitIdx": self.commitIdx,
+            "staged": self.staged
+        }
         route = "vote_req"
         while self.status == CANDIDATE and self.term == term:
             reply = utils.send(voter, route, message)
@@ -81,11 +85,13 @@ class Node():
     # ELECTION TIME FOLLOWER
 
     # some other server is asking
-    def decide_vote(self, term, commitIdx):
+    def decide_vote(self, term, commitIdx, staged):
         # new election
         # decline all non-up-to-date candidate's vote request as well
         # but update term all the time, not reset timeout during decision
-        if self.term < term and self.commitIdx <= commitIdx:
+        # also vote for someone that has our staged version or a more updated one
+        if self.term < term and self.commitIdx <= commitIdx and (
+                staged or (self.staged == staged)):
             self.reset_timeout()
             self.term = term
             return True, self.term
@@ -97,24 +103,48 @@ class Node():
 
     def startHeartBeat(self):
         print("Starting HEARTBEAT")
+        if self.staged:
+            # we have something staged at the beginngin of our leadership
+            # we consider it as a new payload just received and spread it aorund
+            self.handle_put(self.staged)
+
         for each in self.fellow:
             t = threading.Thread(target=self.send_heartbeat, args=(each, ))
             t.start()
 
+    def update_follower_commitIdx(self, follower):
+        route = "heartbeat"
+        first_message = {"term": self.term, "addr": self.addr}
+        second_message = {
+            "term": self.term,
+            "addr": self.addr,
+            "action": "commit",
+            "payload": self.log[-1]
+        }
+        reply = utils.send(follower, route, first_message)
+        if reply and reply.json()["commitIdx"] < self.commitIdx:
+            # they are behind one commit, send follower the commit:
+            reply = utils.send(follower, route, second_message)
+
     def send_heartbeat(self, follower):
+        # check if the new follower have same commit index, else we tell them to update to our log level
+        if self.log:
+            self.update_follower_commitIdx(follower)
+
         route = "heartbeat"
         message = {"term": self.term, "addr": self.addr}
         while self.status == LEADER:
             start = time.time()
             reply = utils.send(follower, route, message)
             if reply:
-                self.heartbeat_reply_handler(reply.json()["term"])
+                self.heartbeat_reply_handler(reply.json()["term"],
+                                             reply.json()["commitIdx"])
             delta = time.time() - start
             # keep the heartbeat constant even if the network speed is varying
             time.sleep((cfg.HB_TIME - delta) / 1000)
 
     # we may step down when get replied
-    def heartbeat_reply_handler(self, term):
+    def heartbeat_reply_handler(self, term, commitIdx):
         # i thought i was leader, but a follower told me
         # that there is a new term, so i now step down
         if term > self.term:
@@ -161,9 +191,11 @@ class Node():
                     self.staged = payload
                 # proceeding staged transaction
                 else:
+                    if self.staged == None:
+                        self.staged = msg["payload"]
                     self.commit()
 
-        return self.term
+        return self.term, self.commitIdx
 
     # initiate timeout thread, or reset it
     def init_timeout(self):
@@ -185,6 +217,7 @@ class Node():
                 time.sleep(delta)
 
     def handle_get(self, payload):
+        print("getting", payload)
         key = payload["key"]
         if key in self.DB:
             payload["value"] = self.DB[key]
@@ -192,12 +225,25 @@ class Node():
         else:
             return None
 
+    # takes a message and an array of confirmations and spreads it to the followers
+    # if it is a comit it releases the lock
+    def spread_update(self, message, confirmations, unlock=False):
+        for i, each in enumerate(self.fellow):
+            r = utils.send(each, "heartbeat", message)
+            if r:
+                print(f" - - {message['action']} by {each}")
+                confirmations[i] = True
+        if unlock and (sum(confirmations) + 1) >= self.majority:
+            print("unlocked")
+            self.lock.release()
+
     def handle_put(self, payload):
+        print("putting", payload)
+
         # lock to only handle one request at a time
         self.lock.acquire()
         self.staged = payload
-        success = False
-        confirmation_counter = 0
+        waited = 0
         msg = {
             "term": self.term,
             "addr": self.addr,
@@ -205,22 +251,30 @@ class Node():
             "action": "log"
         }
 
-        # sending first msg
-        for each in self.fellow:
-            r = utils.send(each, "heartbeat", msg)
-            if r:
-                confirmation_counter += 1
-
-        # sending confirmation msg once majority reached
-        if confirmation_counter >= self.majority:
-            self.commit()
-            msg["action"] = "confirm"
-            for each in self.fellow:
-                r = utils.send(each, "heartbeat", msg)
-            success = True
-
-        self.lock.release()
-        return success
+        # spread log  to everyone
+        log_confirmations = [False] * len(self.fellow)
+        threading.Thread(target=self.spread_update,
+                         args=(msg, log_confirmations)).start()
+        while sum(log_confirmations) + 1 < self.majority:
+            waited += 0.0005
+            time.sleep(0.0005)
+            if waited > cfg.MAX_LOG_WAIT / 1000:
+                print(f"waited {cfg.MAX_LOG_WAIT} ms, update rejected:")
+                return False
+        # reach this point only if a majority has replied and tell everyone to commit
+        msg = {
+            "term": self.term,
+            "addr": self.addr,
+            "payload": payload,
+            "action": "commit"
+        }
+        self.commit()
+        # time.sleep(cfg.HB_TIME/1000)
+        commit_confirmations = [False] * len(self.fellow)
+        threading.Thread(target=self.spread_update,
+                         args=(msg, commit_confirmations, True)).start()
+        print("commited and replied to client")
+        return True
 
     # put staged key-value pair into local database
     def commit(self):
@@ -229,3 +283,5 @@ class Node():
         key = self.staged["key"]
         value = self.staged["value"]
         self.DB[key] = value
+        # empty the staged so we can vote accordingly if there is a tie
+        self.staged = None
