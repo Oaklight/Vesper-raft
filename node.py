@@ -183,7 +183,7 @@ class Node():
 
             # handle client request
             if "action" in msg:
-                print("received action, msg", msg)
+                print("received action", msg)
                 action = msg["action"]
                 # logging after first msg
                 if action == "log":
@@ -227,15 +227,15 @@ class Node():
 
     # takes a message and an array of confirmations and spreads it to the followers
     # if it is a comit it releases the lock
-    def spread_update(self, message, confirmations, unlock=False):
+    def spread_update(self, message, confirmations, lock=None):
         for i, each in enumerate(self.fellow):
             r = utils.send(each, "heartbeat", message)
             if r:
-                print(f" - - {message['action']} by {each}")
+                # print(f" - - {message['action']} by {each}")
                 confirmations[i] = True
-        if unlock and (sum(confirmations) + 1) >= self.majority:
-            print("unlocked")
-            self.lock.release()
+        if lock and (sum(confirmations) + 1) >= self.majority:
+            # print("unlocked")
+            lock.release()
 
     def handle_put(self, payload):
         print("putting", payload)
@@ -272,8 +272,8 @@ class Node():
         # time.sleep(cfg.HB_TIME/1000)
         commit_confirmations = [False] * len(self.fellow)
         threading.Thread(target=self.spread_update,
-                         args=(msg, commit_confirmations, True)).start()
-        print("commited and replied to client")
+                         args=(msg, commit_confirmations, self.lock)).start()
+        print("majority reached, replied to client, sending message to commit")
         return True
 
     # put staged key-value pair into local database
