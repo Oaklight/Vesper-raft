@@ -1,7 +1,7 @@
 # Vesper
 a fault tolerant distributed Key value store using the raft consensus algorithm.
 
-# Names and e-mail addresses of all the students in the group
+# Names and e-mail addresses of all the students in the group (first name alphabetical order)
 Nicola Manzini nmanzini@uchicago.edu  
 Peng Ding dingpeng@uchicago.edu
 
