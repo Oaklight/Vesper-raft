@@ -81,4 +81,4 @@ if __name__ == "__main__":
         n = Node(ip_list, my_ip)
         app.run(host="0.0.0.0", port=int(port), debug=False)
     else:
-        print("usage: python server.py index ip_list_file")
+        print("usage: python server.py <index> <ip_list_file>")

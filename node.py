@@ -191,8 +191,8 @@ class Node():
                     payload = msg["payload"]
                     self.staged = payload
                 # proceeding staged transaction
-                else:
-                    if self.staged == None:
+                elif self.commitIdx <= msg["commitIdx"]:
+                    if not self.staged:
                         self.staged = msg["payload"]
                     self.commit()
 
@@ -234,7 +234,8 @@ class Node():
             if r and confirmations:
                 # print(f" - - {message['action']} by {each}")
                 confirmations[i] = True
-        lock.release()
+        if lock:
+            lock.release()
 
     def handle_put(self, payload):
         print("putting", payload)
@@ -247,8 +248,10 @@ class Node():
             "term": self.term,
             "addr": self.addr,
             "payload": payload,
-            "action": "log"
+            "action": "log",
+            "commitIdx": self.commitIdx
         }
+
         # spread log  to everyone
         log_confirmations = [False] * len(self.fellow)
         threading.Thread(target=self.spread_update,
@@ -265,7 +268,8 @@ class Node():
             "term": self.term,
             "addr": self.addr,
             "payload": payload,
-            "action": "commit"
+            "action": "commit",
+            "commitIdx": self.commitIdx
         }
         self.commit()
         threading.Thread(target=self.spread_update,
