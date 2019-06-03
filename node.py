@@ -18,7 +18,7 @@ class Node():
         self.staged = None
         self.term = 0
         self.status = FOLLOWER
-        self.majority = ((len(self.fellow) + 1) / 2) + 1
+        self.majority = ((len(self.fellow) + 1) // 2) + 1
         self.voteCount = 0
         self.commitIdx = 0
         self.timeout_thread = None
@@ -26,7 +26,7 @@ class Node():
 
     # increment only when we are candidate and receive positve vote
     # change status to LEADER and start heartbeat as soon as we reach majority
-    def incrementVote(self, voter):
+    def incrementVote(self):
         self.voteCount += 1
         if self.voteCount >= self.majority:
             print(f"{self.addr} becomes the leader of term {self.term}")
@@ -37,9 +37,10 @@ class Node():
     # reset the timeout and start sending request to followers
     def startElection(self):
         self.term += 1
-        self.voteCount = 1
+        self.voteCount = 0
         self.status = CANDIDATE
         self.init_timeout()
+        self.incrementVote()
         self.send_vote_req()
 
     # ------------------------------
@@ -70,7 +71,7 @@ class Node():
                 choice = reply.json()["choice"]
                 # print(f"RECEIVED VOTE {choice} from {voter}")
                 if choice and self.status == CANDIDATE:
-                    self.incrementVote(voter)
+                    self.incrementVote()
                 elif not choice:
                     # they declined because either I'm out-of-date or not newest term
                     # update my term and terminate the vote_req
@@ -227,12 +228,13 @@ class Node():
 
     # takes a message and an array of confirmations and spreads it to the followers
     # if it is a comit it releases the lock
-    def spread_update(self, message, confirmations):
+    def spread_update(self, message, confirmations=None, lock=None):
         for i, each in enumerate(self.fellow):
             r = utils.send(each, "heartbeat", message)
-            if r:
+            if r and confirmations:
                 # print(f" - - {message['action']} by {each}")
                 confirmations[i] = True
+        lock.release()
 
     def handle_put(self, payload):
         print("putting", payload)
@@ -241,17 +243,16 @@ class Node():
         self.lock.acquire()
         self.staged = payload
         waited = 0
-        msg = {
+        log_message = {
             "term": self.term,
             "addr": self.addr,
             "payload": payload,
             "action": "log"
         }
-
         # spread log  to everyone
         log_confirmations = [False] * len(self.fellow)
         threading.Thread(target=self.spread_update,
-                         args=(msg, log_confirmations)).start()
+                         args=(log_message, log_confirmations)).start()
         while sum(log_confirmations) + 1 < self.majority:
             waited += 0.0005
             time.sleep(0.0005)
@@ -260,18 +261,15 @@ class Node():
                 self.lock.release()
                 return False
         # reach this point only if a majority has replied and tell everyone to commit
-        msg = {
+        commit_message = {
             "term": self.term,
             "addr": self.addr,
             "payload": payload,
             "action": "commit"
         }
         self.commit()
-        # time.sleep(cfg.HB_TIME/1000)
-        commit_confirmations = [False] * len(self.fellow)
         threading.Thread(target=self.spread_update,
-                         args=(msg, commit_confirmations)).start()
-        self.lock.release()
+                         args=(commit_message, None, self.lock)).start()
         print("majority reached, replied to client, sending message to commit")
         return True
 
