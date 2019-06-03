@@ -1,13 +1,24 @@
-# Interaction with the client
-## get request
+# Interaction between client and server
+the client interects with the client with an http request to the route `/request` using the mandated json format as a body of the request.
+## `GET` request
+`@app.route("/request", methods=['GET'])`
 - if we are the leader: we access the store and reply with key and value
-- if we are a follower: we reply with the ip address of the leader
-- if we are a candidate we reply with a failure, it means an election is going on and we do not know who is the leader right now
+- if we are a follower: we reply with the ip address of the leader, the clients automatically retries to send the same request to the leader
+- if we are a candidate we reply with a failure, it means an election is going on and we do not know who is the leader right now.
 
-## put request
+## `GET` reply
+- if the key is present in the storage a `code`:`success` is returned, with a payload of `key` and `value`
+- else a `code`:`fail` is returned with no payload
+
+## `PUT` request
+`@app.route("/request", methods=['PUT'])`
 - if we are the leader: we start the process of log replication and we reply positively once a majority of followers has added this update to their log, more details in the [Log Replication paragraph](#log-replication) 
-- if we are a follower: we reply with the ip address of the leader
-- if we are a candidate we reply with a failure, it means an election is going on and we do not know who is the leader right now
+- if we are a follower: we reply with the ip address of the leader, the clients automatically retries to send the same request to the leader
+- if we are a candidate we reply with a failure, it means an election is going on and we do not know who is the leader right now.
+
+## `PUT` reply
+- if the key is successfully inserted in the key value store a `code`:`success` is returned, with no payload
+- else a `code`:`fail` is returned with no payload
 
 # Log Replication
 this is the most complicated part of the project, after much studying and talking with TA and PROFESSOR we decided to go for this approach. 
