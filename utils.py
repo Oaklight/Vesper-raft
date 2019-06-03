@@ -9,7 +9,6 @@ def random_timeout():
 
 def send(addr, route, message):
     url = addr + '/' + route
-
     try:
         reply = requests.post(
             url=url,
