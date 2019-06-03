@@ -7,9 +7,19 @@ def redirectToLeader(server_address, message):
     while True:
         # switching between "get" and "put"
         if type == "get":
-            response = requests.get(server_address, json=message)
+            try:
+                response = requests.get(server_address,
+                                        json=message,
+                                        timeout=1)
+            except Exception as e:
+                return e
         else:
-            response = requests.put(server_address, json=message)
+            try:
+                response = requests.put(server_address,
+                                        json=message,
+                                        timeout=1)
+            except Exception as e:
+                return e
 
         # if valid response and an address in the "message" section in reply
         # redirect server_address to the potential leader
