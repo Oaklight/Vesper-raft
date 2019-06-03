@@ -21,7 +21,7 @@ here we perform these action:
 - create `log_confirmations` to count how many follower accepted the request (we will confirm back to the client only if a majority has accepted the update).
 - start a thread with the function `self.spread_update` to send `log_message` to all the followers, each positive request is logged in `log_confirmations`.
 - while the thread is telling the follower to update we continuously check if we reached a majority of confirmations by counting the positive answers in `log_confirmations`:
-  - if we do not reach it after `cfg.MAX_LOG_WAIT` millisecond we `return False` a failure to the client and we do not proceed with the commit process, hence in the next update `self.staged` will be overwritten adn forgotten by the LEADER and its follower. we releas the lock before returning, so we can accept new updates
+  - if we do not reach it after `cfg.MAX_LOG_WAIT` millisecond we `return False` a failure to the client and we do not proceed with the commit process, hence in the next update `self.staged` will be overwritten adn forgotten by the LEADER and its follower. we release the lock before returning, so we can accept new updates
   - if we reach a majority in less than `cfg.MAX_LOG_WAIT` millisecond we proceed with the committing process.
   - `cfg.MAX_LOG_WAIT` is a sort of server side timeout in case a majority is not reached .
 - we continue if a majority of confirmations is reached, we call `self.commit()` to add our staged update to our definitive store `self.DB`.
@@ -41,7 +41,7 @@ hence we have a few possibilities:
 
 # Leader fail-stop while replicating the log
 
-as described in the [Log Replication paragraph](#log-replication)  we perform a `staging` operation to the leader and follower(temporarly logging the update in `self.staged`). if we receive a majority of consensus we perform the `committing` operation to the leader and follower (save the update to `self.DB`). each single `POST` operation is atomic because we lock before the staging operation and we release after the committing. this atomicity makes it easier to prove the fault tolerance during the log replication.
+as described in the [Log Replication paragraph](#log-replication)  we perform a `staging` operation to the leader and follower(temporarily logging the update in `self.staged`). if we receive a majority of consensus we perform the `committing` operation to the leader and follower (save the update to `self.DB`). each single `POST` operation is atomic because we lock before the staging operation and we release after the committing. this atomicity makes it easier to prove the fault tolerance during the log replication.
 
 if the client receive a success update, we make sure that the new leader will have that update and log it in the right order.
 
@@ -68,7 +68,7 @@ The Leader might crash in these moments:
   - the new leader will have a the committed index and will make all the follower without the update commit it with a call to update_follower_commitIdx
 - after the `committing`:
   - the client already received a success
-  - all the follower will have the update commited so the state is stable.
+  - all the follower will have the update committed so the state is stable.
 
 
 
