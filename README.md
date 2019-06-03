@@ -1,7 +1,15 @@
 # Vesper
 a fault tolerant distributed Key value store using the raft consensus algorithm.
 
-# how to run SERVER
+# Names and e-mail addresses of all the students in the group
+Nicola Manzini nmanzini@uchicago.edu  
+Peng Ding dingpeng@uchicago.edu
+
+# A description of what each student worked on
+we pair programmed the entire project.
+
+# Concise instructions on how we should run your scripts 
+## how to run SERVER
 each server is initialized with an index and an ip_list.txt
 ```
 usage: python3 server.py <id> <ip-list-file>
@@ -26,7 +34,7 @@ http://127.0.0.1:5004
 ➜  python3 server.py 4 ip_list.txt
 ```
 
-# how to run the CLIENT
+## how to run the CLIENT
 the client can perform `GET` and `PUT` request from the command line.
 - the first argument is alwasy the http://ip:port of a functioning server
 - the second is the key
@@ -45,7 +53,7 @@ example of PUT key="name" , value="Kyle Chard"
 ➜  python3 client.py http://127.0.0.1:5000 name "Kyle Chard"
 {'code': 'success'}
 ```
-example of GET
+example of GET key="name" 
 ```
 ➜  python3 client.py http://127.0.0.1:5000 name 
 {'code': 'success', 'payload': {'key': 'name', 'value': 'Kyle Chard'}}
