@@ -5,7 +5,7 @@
 - if we are a candidate we reply with a failure, it means an election is going on and we do not know who is the leader right now
 
 ## put request
-- if we are the leader: we start the process of log replication and we reply positively once a majority of followershas added this update to their log, more details in the [Log Replication paragraph](#log-replication) 
+- if we are the leader: we start the process of log replication and we reply positively once a majority of followers has added this update to their log, more details in the [Log Replication paragraph](#log-replication) 
 - if we are a follower: we reply with the ip address of the leader
 - if we are a candidate we reply with a failure, it means an election is going on and we do not know who is the leader right now
 
@@ -52,7 +52,7 @@ The Leader might crash in these moments:
 - while sending the `staging` messages but before reaching a majority of confirmations:
   - the client wil not receive a success/failure, instead it will receive a `requests.exceptions.ConnectionError:`
   - the update has been communicated to less than majority other followers so a minority of follower have the update. here we have to decide who to elect, RAFT tells us in section 5.4 to vote as a new leader the most updated version, and we do that in `decide_vote` we check for `commitIdx` and the state of the `staged`, we try to vote for server with a `>= commitIdx` than us and same or more updated version of `staged`
-  - I talked long with the PROFESSOR and we decided to go with what the raft recommended, let the most updated follower win. the problem is that a follower might vote for a candidate with its own level of updatedness not knowing yet there are more updated candidates. the outcome of this election is unpredictable
+  - I talked long with the PROFESSOR and we decided to go with what the raft recommended, let the most updated follower win. the problem is that a follower might vote for a candidate with its own level of updated-ness not knowing yet there are more updated candidates. the outcome of this election is unpredictable
 - while sending the `staging` messages after reaching a majority of confirmations:
   - the client wil receive a success
   - the update reached a majority of server, we always vote for the most updated one so an updated follower will win the election. it will take care to give it to all the followers and try to commit it.
@@ -61,7 +61,7 @@ The Leader might crash in these moments:
   - the new leader will have the update in `self.staged` and will push it to the followers
 - during the `committing` but without a majority of follower committing it:
   - the client already received a success
-  - the majority hasn't committed the update yet: we vote for the most updated commitidx but there is a chance that
+  - the majority hasn't committed the update yet: we vote for the most updated commitidx but there is a chance that a group of non commited followers vote for one of their own without having seen the committed Candidate. we fix this situation by discarding the commit request by Leaders with a commitIdx lowers than ours
   - TODO: handle safely this option
 - during the `committing` without a majority of follower committing it:
   - the client already received a success
@@ -72,7 +72,7 @@ The Leader might crash in these moments:
 
 
 
-as soon as a server wins the election it checks 2 options:
+as soon as a server wins the election it checks 2 options to sync itself with the followers:
 - if it has an element in `self.staged`: it will push it to all the new followers and then make them commit them if a majority of consensus is reached. done in `def startHeartBeat`.
 - it will query each follower for their commitIdx and if it is lower it will give them  the update they lack. done in `update_follower_commitIdx`
 

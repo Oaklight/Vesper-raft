@@ -191,7 +191,7 @@ class Node():
                     payload = msg["payload"]
                     self.staged = payload
                 # proceeding staged transaction
-                elif self.commitIdx < msg["commitIdx"]:
+                elif self.commitIdx <= msg["commitIdx"]:
                     if not self.staged:
                         self.staged = msg["payload"]
                     self.commit()
@@ -264,7 +264,6 @@ class Node():
                 self.lock.release()
                 return False
         # reach this point only if a majority has replied and tell everyone to commit
-        self.commit()
         commit_message = {
             "term": self.term,
             "addr": self.addr,
@@ -272,6 +271,7 @@ class Node():
             "action": "commit",
             "commitIdx": self.commitIdx
         }
+        self.commit()
         threading.Thread(target=self.spread_update,
                          args=(commit_message, None, self.lock)).start()
         print("majority reached, replied to client, sending message to commit")
